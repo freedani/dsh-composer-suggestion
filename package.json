@@ -1,6 +1,6 @@
 {
   "name": "dsh-composer-suggestion",
-  "version": "1.2.8-next.1",
+  "version": "0.1.0",
   "description": "Fork of dsh-composer-predictions with one switch per trigger: the after-turn suggestion and the mid-draft prediction are enabled independently, on a Settings page of their own",
   "type": "module",
   "license": "MIT",
@@ -13,7 +13,10 @@
     "deepseek-harness",
     "composer",
     "autocomplete",
-    "tab-completion"
+    "tab-completion",
+    "suggestion",
+    "ghost-text",
+    "prompt"
   ],
   "publishConfig": {
     "access": "public"

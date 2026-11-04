@@ -6,6 +6,37 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-04
+
+First release of this fork under its own package id.
+
+### Added
+
+- One switch per trigger on a Settings page of its own: "next message" (default
+  on) and "mid-draft prediction" (default off). Upstream had a single master
+  switch, so keeping only the after-turn suggestion meant deleting the other
+  trigger; a user who had the master switch off keeps both off.
+- `sharePromptCache`: the Host sends the exact prefix the agent loop used (tool
+  schemas plus the full message history) so the provider's prefix cache can serve
+  it, and falls back to the small self-contained prompt if that request fails.
+- `test/client-registration.test.js`, which fails when the id inside the client
+  bundle drifts from `package.json`'s name.
+- A README that documents this fork rather than upstream.
+
+### Changed
+
+- Package id, bundle row, locale namespace, HTTP routes, slot ids and preference
+  keys all follow `dsh-composer-suggestion`, so the bundle can be installed beside
+  the upstream package instead of replacing it.
+- The star link points at this repository.
+
+### Removed
+
+- Upstream release machinery that cannot apply here: `.github/workflows/release.yml`
+  (npm trusted publishing for the upstream package), `RELEASING.md`,
+  `market-index.json` and `tools/live-probe.mjs`.
+- The upstream launch post in `docs/`.
+
 ## [1.2.8] - 2026-10-28
 
 ### Changed
