@@ -93,6 +93,7 @@ node --test     # runs the tests in test/
 ```
 
 `client.js` and `index.js` are the sources; there is no build step.
+Release and distribution steps live in [RELEASING.md](RELEASING.md).
 
 ## License
 
