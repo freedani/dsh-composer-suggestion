@@ -1,15 +1,15 @@
-# dsh-composer-predictions
+# dsh-composer-suggestion
 
 [English](./README.md) · [中文](./README.zh-CN.md)
 
-[![npm](https://img.shields.io/npm/v/dsh-composer-predictions)](https://www.npmjs.com/package/dsh-composer-predictions)
-[![license](https://img.shields.io/npm/l/dsh-composer-predictions)](LICENSE)
+[![npm](https://img.shields.io/npm/v/dsh-composer-suggestion)](https://www.npmjs.com/package/dsh-composer-suggestion)
+[![license](https://img.shields.io/npm/l/dsh-composer-suggestion)](LICENSE)
 [![topic](https://img.shields.io/badge/topic-dsh--plugin-blue)](https://github.com/topics/dsh-plugin)
 
 AI autocomplete and ghost-text suggestions for the composer in **DeepSeek
 Harness desktop and the Web GUI**.
 
-**Current release: [latest on npm](https://www.npmjs.com/package/dsh-composer-predictions)** · [Install or update](#install) · [中文说明](#中文说明)
+**Current release: [latest on npm](https://www.npmjs.com/package/dsh-composer-suggestion)** · [Install or update](#install) · [中文说明](#中文说明)
 
 - **Next message** — after the agent replies, the empty composer shows a
   streamed suggestion for your likely next message. **Tab** accepts it as an

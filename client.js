@@ -16,7 +16,7 @@
  */
 
 window.__ModuleLoader__.load({
-  id: 'dsh-composer-predictions',
+  id: 'dsh-composer-suggestion',
   factory(require) {
     const React = require('react')
     const h = React.createElement

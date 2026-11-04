@@ -26,7 +26,7 @@ DeepSeek Harness `>=0.2.1-rc.3 <0.3.0-0`，Web profile（桌面版或 Web 界面
 ## 相关链接
 
 - 英文说明（完整细节）：[README.md](./README.md)
-- npm：<https://www.npmjs.com/package/dsh-composer-predictions>
+- npm：<https://www.npmjs.com/package/dsh-composer-suggestion>
 - 更新记录：[CHANGELOG.md](./CHANGELOG.md)
 
 <sub>同系列插件：[情绪板](https://github.com/Stijnus/dsh-moodboard) · [输入补全](https://github.com/Stijnus/dsh-composer-predictions) · [移动到工作区](https://github.com/Stijnus/dsh-move-to-workspace) · [工作区状态](https://github.com/Stijnus/dsh-workspace-status) · [提示词改写](https://github.com/Stijnus/dsh-prompt-optimizer)</sub>

@@ -1,7 +1,7 @@
 {
-  "name": "dsh-composer-predictions",
-  "version": "1.2.8",
-  "description": "Tab autocomplete for the DeepSeek Harness desktop and web composer: next-message ghost text, inline draft completion and keyboard candidate cycling",
+  "name": "dsh-composer-suggestion",
+  "version": "1.2.8-next.1",
+  "description": "Composer suggestions for the DeepSeek Harness: a switchable next-message suggestion and mid-draft prediction, shipped under this package id",
   "type": "module",
   "license": "MIT",
   "scripts": {
@@ -47,18 +47,18 @@
     "catalog": {
       "summary": {
         "en": "Tab autocomplete for the DeepSeek Harness composer: next-message ghost text, inline draft completion and keyboard candidate cycling.",
-        "zh": "DeepSeek Harness \u8f93\u5165\u6846\u7684 Tab \u81ea\u52a8\u8865\u5168\uff1a\u56de\u590d\u540e\u7684\u4e0b\u4e00\u53e5\u5efa\u8bae\u3001\u8f93\u5165\u505c\u987f\u65f6\u7684\u8349\u7a3f\u7eed\u5199\uff0c\u4ee5\u53ca\u952e\u76d8\u5207\u6362\u5019\u9009\u3002"
+        "zh": "DeepSeek Harness 输入框的 Tab 自动补全：回复后的下一句建议、输入停顿时的草稿续写，以及键盘切换候选。"
       },
       "category": "ui"
     }
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Stijnus/dsh-composer-predictions.git"
+    "url": "git+https://github.com/freedani/dsh-composer-suggestion.git"
   },
-  "homepage": "https://github.com/Stijnus/dsh-composer-predictions#readme",
+  "homepage": "https://github.com/freedani/dsh-composer-suggestion#readme",
   "bugs": {
-    "url": "https://github.com/Stijnus/dsh-composer-predictions/issues"
+    "url": "https://github.com/freedani/dsh-composer-suggestion/issues"
   },
   "engines": {
     "dsh": ">=0.2.1-rc.3 <0.3.0-0"
