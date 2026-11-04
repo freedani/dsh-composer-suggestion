@@ -139,8 +139,8 @@ function sseEvents(response) {
     .map((frame) => JSON.parse(frame.replace(/^data: /, '').trim()))
 }
 
-const JSON_ENTRY = '/composer-prediction'
-const STREAM_ENTRY = '/composer-prediction/v2'
+const JSON_ENTRY = '/composer-suggestion'
+const STREAM_ENTRY = '/composer-suggestion/v2'
 
 const CONVERSATION = [
   text('user', 'The build is failing on the new test.'),

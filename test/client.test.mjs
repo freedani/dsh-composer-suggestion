@@ -19,7 +19,7 @@ test('client half registers the composer overlay slot', async () => {
 
   await import('../client.js')
   assert.ok(definition, 'the module loader receives one definition')
-  assert.equal(definition.id, 'dsh-composer-predictions')
+  assert.equal(definition.id, 'dsh-composer-suggestion')
   assert.equal(typeof definition.factory, 'function')
 
   const react = {
@@ -66,14 +66,14 @@ test('client half registers the composer overlay slot', async () => {
   module.apply(ctx)
 
   assert.equal(localeRegistrations.length, 1)
-  assert.equal(localeRegistrations[0].namespace, 'composer-predictions')
+  assert.equal(localeRegistrations[0].namespace, 'composer-suggestion')
   assert.equal(typeof localeRegistrations[0].dictionaries.en.accept, 'string')
 
   assert.equal(registered.length, 2)
 
   const overlayRegistration = registered.find((entry) => entry.spec.name === 'conversation.input.overlay')
   assert.ok(overlayRegistration)
-  assert.equal(overlayRegistration.spec.id, 'composer-predictions')
+  assert.equal(overlayRegistration.spec.id, 'composer-suggestion')
   assert.equal(typeof overlayRegistration.component, 'function')
 
   assert.ok(!registered.some((entry) => entry.spec.name === 'shell.overlay'), 'no timed star popup registers on the shell overlay')
@@ -135,17 +135,23 @@ test('stream consumption requires a terminal event and handles split UTF-8 frame
   assert.equal(await consumeStream(incomplete, new AbortController().signal, () => {}), false)
 })
 
-test('prediction preference persists and works without local storage', async () => {
+test('each trigger keeps its own preference, and survives blocked storage', async () => {
   let definition
   let stored = 'false'
   globalThis.window = { localStorage: { getItem: () => stored, setItem: (_key, value) => { stored = value } }, __ModuleLoader__: { load: value => { definition = value } } }
   await import('../client.js?preference')
-  const { readEnabled, setEnabled } = definition.factory(() => ({})).__testing
-  assert.equal(readEnabled(), false)
-  setEnabled(true)
-  assert.equal(readEnabled(), true)
+  const { preferences, setPreference } = definition.factory(() => ({})).__testing
+  // The old master switch said "off", so both triggers stay quiet instead of
+  // being turned back on by the upgrade.
+  assert.equal(preferences.next, false)
+  assert.equal(preferences.continue, false)
+  setPreference('next', true)
+  assert.equal(preferences.next, true)
+  assert.equal(preferences.continue, false)
   assert.equal(stored, 'true')
   window.localStorage.setItem = () => { throw new Error('Storage blocked') }
-  setEnabled(false)
-  assert.equal(readEnabled(), false)
+  setPreference('continue', true)
+  assert.equal(preferences.continue, true)
+  setPreference('next', false)
+  assert.equal(preferences.next, false)
 })

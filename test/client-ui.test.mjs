@@ -27,6 +27,8 @@ function mount({ draft = 'Can you also', active = false, stream = '', items = ['
   }, useState: () => { const i = index++; return [state[i], value => { state[i] = typeof value === 'function' ? value(state[i]) : value }] }, useRef: () => ({ current: null }), useCallback: fn => { request = fn; return fn }, useEffect: fn => effects.push(fn), useLayoutEffect: fn => layouts.push(fn), useSyncExternalStore: (_subscribe, read) => read() }
   vm.runInNewContext(source, { window, document, fetch, AbortController, TextDecoder, ReadableStream, requestAnimationFrame: () => 1, cancelAnimationFrame() {}, setTimeout: () => 1, clearTimeout() {} })
   const module = definition.factory(id => id === 'react' ? react : { Switch: 'switch' })
+  // These cases all exercise the mid-draft trigger, which ships disabled.
+  module.__testing.setPreference('continue', true)
   module.apply({ locale: { bind: () => key => key, register() {} }, effect: fn => fn(), slots: { inject: (_name, fn) => fn(), register: (spec, component) => { if (spec.name === 'conversation.input.overlay') registered = component } } })
   const inputActions = { captureInsertion: () => ({}), insertText: value => { inserted.push(value); return insert }, setDraft: () => { throw new Error('Must never replace the draft') } }
   const wrapper = registered({ sessionId: 's1', useInput: select => select({ draft }), useSessionStatus: select => select(new Map()), inputActions })
