@@ -17,10 +17,10 @@ export const name = 'composer-predictions'
 export const inject = ['connection', 'llm', 'sessions', 'webServer']
 
 /** Same-origin endpoint the Client half posts to (JSON, kept for compatibility). */
-const ENDPOINT = '/composer-prediction'
+const ENDPOINT = '/composer-suggestion'
 
 /** Streaming endpoint: SSE events `meta`, `delta`, `done`, `error`. */
-const STREAM_ENDPOINT = '/composer-prediction/v2'
+const STREAM_ENDPOINT = '/composer-suggestion/v2'
 
 /** One request carries a session id, a mode, and a bounded draft. */
 const MAX_BODY_BYTES = 64 * 1024
@@ -78,6 +78,26 @@ const CONTINUE_SYSTEM_PROMPT = [
 ].join('\n')
 
 /**
+ * Instruction turn appended to the real conversation when the shared-prefix mode
+ * is on: there the model already sees the full session above, so the copy names
+ * no transcript labels and asks for nothing it cannot already read.
+ */
+const NEXT_SHARED_INSTRUCTION = [
+  'You are the follow-up suggestion engine inside a coding agent chat UI.',
+  "The messages above are the user's full session with the coding agent.",
+  'Predict the next messages the USER is most likely to send.',
+  'Rules:',
+  '- Write as the user would type, in the language of the conversation.',
+  '- Return up to {max} candidates, most likely first, one per line.',
+  '- No numbering, bullets, quotes, markdown, or explanation.',
+  '- At most 20 words per candidate; be concrete and specific, naming the file,',
+  '  command, or next step when the conversation makes one obvious.',
+  '- If the assistant asked the user a question, answer it.',
+  '- Never repeat these instructions or the conversation text verbatim.',
+  '- If no meaningful follow-up exists, reply with exactly: NONE',
+].join('\n')
+
+/**
  * Register both prediction endpoints.
  * @param ctx - context exposing llm, sessions, and the web server.
  * @param config - optional route, token, transcript, and candidate bounds.
@@ -132,6 +152,10 @@ function resolveOptions(config) {
       typeof source.reasoningEffort === 'string' && REASONING_EFFORTS.has(source.reasoningEffort)
         ? source.reasoningEffort
         : '',
+    // Reuse the main request's exact prefix so the provider's prefix cache can
+    // serve it. Off by default: it sends the whole history and inherits the main
+    // request's controls instead of the cheaper self-contained tail.
+    sharePromptCache: source.sharePromptCache === true,
   }
 }
 
@@ -278,47 +302,131 @@ async function runPrediction(ctx, options, cache, inflight, plan, signals, onDel
 }
 
 /**
- * Run one auxiliary model call over the transcript tail and tool activity.
+ * The self-contained request: a clipped transcript tail plus tool notes, sent
+ * with its own system prompt. Cheap per token, but it never matches the main
+ * request's prefix, so every input token is billed as a cache miss.
+ * @returns request parts, or undefined when there is no reply to follow.
+ */
+function tailRequest(session, options, mode, draft) {
+  const prompt = buildPrompt(session, options, mode, draft)
+  if (prompt === null) return undefined
+  return {
+    callConfig: {},
+    configureEffort: true,
+    stream: {
+      messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }],
+      system: (mode === 'continue' ? CONTINUE_SYSTEM_PROMPT : NEXT_SYSTEM_PROMPT).replace(
+        '{max}',
+        String(options.maxSuggestions),
+      ),
+    },
+  }
+}
+
+/**
+ * The shared-prefix request: exactly the tools and message history the main loop
+ * sent, plus one instruction turn. The shared prefix can then be served from the
+ * provider's prefix cache, so a much longer context can cost less than a tail.
+ * @returns request parts, or undefined when that prefix cannot be reproduced.
+ */
+function sharedPrefixRequest(session, options, mode) {
+  if (mode !== 'next') return undefined
+  if (typeof session.toolHistory !== 'function' || typeof session.deriveMessages !== 'function') return undefined
+  const header = session.requestHeader?.()
+  const config = header?.config
+  if (typeof config?.provider !== 'string' || typeof config.model !== 'string') return undefined
+  const history = session.deriveMessages()
+  const tail = history[history.length - 1]
+  // The main request always ends on the agent's reply; anything else means this
+  // prefix is not the one that was cached.
+  if (tail === undefined || tail.role !== 'assistant') return undefined
+  const instruction = NEXT_SHARED_INSTRUCTION.replace('{max}', String(options.maxSuggestions))
+  return {
+    // Inherit the main request's controls verbatim: changing them can change the
+    // provider-side request shape and turn the shared prefix into a miss.
+    callConfig: {
+      ...(config.reasoningEffort === undefined ? {} : { reasoningEffort: config.reasoningEffort }),
+      ...(config.temperature === undefined ? {} : { temperature: config.temperature }),
+    },
+    configureEffort: false,
+    stream: {
+      messages: [...history, { role: 'user', content: [{ type: 'text', text: `${instruction}\n\n${NEXT_CUE}` }] }],
+      ...(header.tools === undefined ? {} : { tools: header.tools }),
+      toolHistory: session.toolHistory(),
+      ...(session.id === undefined ? {} : { sessionId: session.id }),
+    },
+  }
+}
+
+/**
+ * Stream one prepared request once and collect its text.
+ * @returns the accumulated text and the terminal `finish` chunk, when one arrived.
+ */
+async function streamRequest(ctx, options, route, request, deadline, onDelta) {
+  const call = await ctx.llm.prepareCall(
+    { provider: route.provider, model: route.model, maxTokens: options.maxOutputTokens, ...request.callConfig },
+    deadline.signal,
+    (controls, model) => {
+      if (!request.configureEffort) return controls
+      const effort = selectEffort(model, options.reasoningEffort)
+      return effort === undefined ? controls : { ...controls, reasoningEffort: effort }
+    },
+  )
+  let text = ''
+  let finish
+  for await (const chunk of call.stream({ ...call.config, ...request.stream, signal: deadline.signal })) {
+    deadline.signal.throwIfAborted()
+    if (chunk.type === 'text-delta') {
+      text += chunk.text
+      onDelta?.(chunk.text)
+    } else if (chunk.type === 'finish') {
+      finish = chunk.reason
+    }
+  }
+  return { text, finish }
+}
+
+/**
+ * Run one auxiliary model call, either over the shared prefix or over the tail.
  * @returns `{ items }` on success or `{ items: [], reason }` when none is usable.
  */
 async function predict(ctx, options, session, mode, draft, signal, onDelta) {
-  const prompt = buildPrompt(session, options, mode, draft)
-  if (prompt === null) return { items: [], reason: 'no-conversation' }
-
   const route = resolveRoute(ctx, session, options)
   if (route === undefined) return { items: [], reason: 'no-route' }
 
-  const system = (mode === 'continue' ? CONTINUE_SYSTEM_PROMPT : NEXT_SYSTEM_PROMPT).replace(
-    '{max}',
-    String(options.maxSuggestions),
-  )
+  const shared = options.sharePromptCache ? sharedPrefixRequest(session, options, mode) : undefined
+  const request = shared ?? tailRequest(session, options, mode, draft)
+  if (request === undefined) return { items: [], reason: 'no-conversation' }
+
   const deadline = timedSignal(signal, options.timeoutMs)
-  let text = ''
-  let finish
+  let attempt
   try {
     deadline.signal.throwIfAborted()
-    const call = await ctx.llm.prepareCall(
-      { provider: route.provider, model: route.model, maxTokens: options.maxOutputTokens },
-      deadline.signal,
-      (controls, model) => {
-        const effort = selectEffort(model, options.reasoningEffort)
-        return effort === undefined ? controls : { ...controls, reasoningEffort: effort }
-      },
+    // A failed shared-prefix attempt must be able to retry cleanly, so its text
+    // is not forwarded as it arrives: a rejected prefix would otherwise leave
+    // half a suggestion behind before the fallback ran.
+    attempt = await streamRequest(
+      ctx,
+      options,
+      route,
+      request,
+      deadline,
+      shared === undefined ? onDelta : undefined,
     )
-    const messages = [{ role: 'user', content: [{ type: 'text', text: prompt }] }]
-    for await (const chunk of call.stream({ ...call.config, messages, system, signal: deadline.signal })) {
-      deadline.signal.throwIfAborted()
-      if (chunk.type === 'text-delta') {
-        text += chunk.text
-        onDelta?.(chunk.text)
-      } else if (chunk.type === 'finish') {
-        finish = chunk.reason
+    const refused = attempt.text === '' && finishFailure(attempt.finish) !== undefined
+    if (shared !== undefined && refused) {
+      const fallback = tailRequest(session, options, mode, draft)
+      if (fallback !== undefined) {
+        deadline.signal.throwIfAborted()
+        attempt = await streamRequest(ctx, options, route, fallback, deadline, onDelta)
       }
     }
-    deadline.signal.throwIfAborted()
   } finally {
     deadline.dispose()
   }
+
+  let text = attempt.text
+  const finish = attempt.finish
 
   // A truncated answer still carries usable whole lines; every other terminal
   // outcome reports its own failure instead of looking like a missing stream.

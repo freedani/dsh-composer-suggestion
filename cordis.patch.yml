@@ -1,19 +1,26 @@
-# Composer suggestions: after a turn ends the Host streams a few follow-up
+# Composer predictions (fork): after a turn ends the Host streams a few follow-up
 # candidates; the Client renders the current one as ghost text and accepts it on
-# Tab (Alt+Down cycles candidates). Shipped under its own package id, so it can
-# sit beside the upstream dsh-composer-predictions bundle.
+# Tab (Alt+Down cycles candidates). Both triggers are switchable on the plugin's
+# own Settings page. This bundle ships as its own package id so it can sit beside
+# the upstream bundle.
 - insert:
     - id: composer-suggestion
       name: dsh-composer-suggestion
       config:
         maxOutputTokens: 220
         timeoutMs: 20000
+        maxSuggestions: 3
+        # Reuse the main request's exact prefix (tools + full history) so the
+        # provider serves it from its prefix cache. Set false to fall back to the
+        # self-contained tail below, which is tiny but always a cache miss.
+        sharePromptCache: true
+        # Only read when sharePromptCache is false:
         maxMessages: 10
         maxChars: 8000
-        maxSuggestions: 3
         maxToolNotes: 6
-        # Optional fixed route for suggestions; both or neither. Without a pair
-        # the Session's own provider/model is used at its lowest reasoning effort.
+        # Optional fixed route for predictions; both or neither. Without a pair
+        # the Session's own provider/model is used, at its own reasoning effort
+        # when sharePromptCache is on (changing it would break the cache).
         # provider: deepseek-account
         # model: deepseek-flash
         # reasoningEffort: off
