@@ -1,7 +1,7 @@
 {
   "name": "dsh-composer-suggestion",
   "version": "1.2.8-next.1",
-  "description": "Composer suggestions for the DeepSeek Harness: a switchable next-message suggestion and mid-draft prediction, shipped under this package id",
+  "description": "Fork of dsh-composer-predictions with one switch per trigger: the after-turn suggestion and the mid-draft prediction are enabled independently, on a Settings page of their own",
   "type": "module",
   "license": "MIT",
   "scripts": {
@@ -46,8 +46,8 @@
     },
     "catalog": {
       "summary": {
-        "en": "Tab autocomplete for the DeepSeek Harness composer: next-message ghost text, inline draft completion and keyboard candidate cycling.",
-        "zh": "DeepSeek Harness 输入框的 Tab 自动补全：回复后的下一句建议、输入停顿时的草稿续写，以及键盘切换候选。"
+        "en": "After each completed turn, one suggested next message appears in an empty composer; press Tab to accept it and Alt+Down to cycle candidates. A second, independent switch turns on mid-draft prediction while you type.",
+        "zh": "每个回合结束后在空输入框里给出一条「下一句」建议；按 Tab 采纳，Alt+↓ 切换候选。另有独立开关可开启打字停顿时的草稿预测。"
       },
       "category": "ui"
     }

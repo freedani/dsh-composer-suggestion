@@ -53,8 +53,8 @@ window.__ModuleLoader__.load({
       )
     }
 
-    const NS = 'composer-predictions'
-    const ENDPOINT = '/composer-prediction/v2'
+    const NS = 'composer-suggestion'
+    const ENDPOINT = '/composer-suggestion/v2'
     const SLOT = 'conversation.input.overlay'
 
     /** Wait for the settled UI before asking, so a fresh turn is fully committed. */
@@ -79,20 +79,28 @@ window.__ModuleLoader__.load({
     const DICTIONARIES = {
       en: {
         label: 'Composer prediction',
+        nav: 'Composer prediction',
         accept: 'Press Tab to accept this suggestion',
         more: 'Alt+Down for the next suggestion',
-        enabled: 'Composer predictions',
-        description: 'Suggest your next message and continue drafts. Uses your model and tokens. Saved in this browser on this device.',
+        nextTitle: 'Suggest the next message',
+        nextDescription: 'After a turn settles with an empty composer, offer one suggestion you can accept with Tab. One model call per turn.',
+        continueTitle: 'Predict the current draft',
+        continueDescription: 'While you pause mid-draft, suggest how the sentence continues. Sends a request after each typing pause, so it costs more than the next-message suggestion.',
+        footnote: 'An accepted suggestion only fills an editable draft; nothing is sent. These switches are saved in this browser on this device.',
         starSuite: 'Star the suite',
         starSuiteTitle: 'Star the Stijnus DSH plugin suite on GitHub',
         ready: 'Suggestion: {text}. Press Tab to accept. Alt+Down or Alt+Up changes candidates. Escape dismisses.',
       },
       zh: {
         label: '输入预测',
+        nav: '输入预测',
         accept: '按 Tab 采纳该建议',
         more: '按 Alt+↓ 查看下一条建议',
-        enabled: '输入预测',
-        description: '建议下一条消息并续写草稿。会调用模型并消耗 token。设置保存在当前设备的浏览器中。',
+        nextTitle: '下一步建议',
+        nextDescription: '回合结束、输入框为空时给出一条建议，按 Tab 采纳为草稿。每个回合一次模型调用。',
+        continueTitle: '当前输入框预测',
+        continueDescription: '打字停顿后预测这句话接下来怎么写。每次停顿都会请求一次，比「下一步建议」更费 token。',
+        footnote: '采纳后只是草稿，不会直接发送。两个开关都保存在当前设备的浏览器中。',
         starSuite: '为插件套件点星',
         starSuiteTitle: '在 GitHub 上为 Stijnus 的 DSH 插件套件点星',
         ready: '建议：{text}。按 Tab 采纳，Alt+↓ 或 Alt+↑ 切换，Escape 关闭。',
@@ -102,43 +110,90 @@ window.__ModuleLoader__.load({
     /** Quiet, user-initiated suite star link. */
     const STAR_SUITE_URL = 'https://github.com/Stijnus?tab=repositories&q=dsh'
 
-    const PREFERENCE_KEY = 'dsh-composer-predictions.enabled'
-    let enabled = true
-    try {
-      enabled = window.localStorage.getItem(PREFERENCE_KEY) !== 'false'
-    } catch {
-      // Restricted storage keeps the preference in memory for this window.
+    /** Per-mode switches: each trigger is enabled on its own. */
+    const PREFERENCE_KEYS = {
+      next: 'dsh-composer-suggestion.next',
+      continue: 'dsh-composer-suggestion.continue',
+    }
+    /** The single switch earlier builds shipped; honoured once, never written. */
+    const LEGACY_PREFERENCE_KEY = 'dsh-composer-predictions.enabled'
+
+    function storedPreference(key) {
+      try {
+        return window.localStorage.getItem(key)
+      } catch {
+        return null
+      }
+    }
+
+    const legacyPreference = storedPreference(LEGACY_PREFERENCE_KEY)
+    const preferences = { next: true, continue: false }
+    for (const mode of Object.keys(PREFERENCE_KEYS)) {
+      const raw = storedPreference(PREFERENCE_KEYS[mode])
+      if (raw !== null) preferences[mode] = raw !== 'false'
+      // An explicit "off" on the old master switch keeps both modes quiet, so a
+      // user who turned suggestions off does not get them back on upgrade.
+      else if (legacyPreference === 'false') preferences[mode] = false
     }
     const preferenceListeners = new Set()
     const subscribePreference = (listener) => {
       preferenceListeners.add(listener)
       return () => preferenceListeners.delete(listener)
     }
-    const readEnabled = () => enabled
-    function setEnabled(value) {
-      enabled = value
+    // Stable getters: a fresh function per render would churn the store snapshot.
+    const preferenceGetters = {
+      next: () => preferences.next,
+      continue: () => preferences.continue,
+    }
+    function setPreference(mode, value) {
+      preferences[mode] = value
       try {
-        window.localStorage.setItem(PREFERENCE_KEY, String(value))
+        window.localStorage.setItem(PREFERENCE_KEYS[mode], String(value))
       } catch {
         // The switch still works for this window when storage is unavailable.
       }
       for (const listener of preferenceListeners) listener()
     }
-    function useEnabled() {
-      return React.useSyncExternalStore(subscribePreference, readEnabled, readEnabled)
+    function usePreference(mode) {
+      const read = preferenceGetters[mode]
+      return React.useSyncExternalStore(subscribePreference, read, read)
     }
-    function PredictionsSetting({ t }) {
-      const checked = useEnabled()
+
+    /** One labelled switch row, matching the Settings page's own row layout. */
+    function PreferenceRow({ title, description, checked, onChange }) {
       return h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24, padding: '16px 0', borderBottom: '0.5px solid var(--dsw-alias-border-l2)' } },
-        h('style', null, SWITCH_CSS),
         h('div', null,
-          h('div', { style: { fontSize: 14, lineHeight: '20px' } }, t('enabled')),
-          h('div', { style: { fontSize: 12, lineHeight: '18px', marginTop: 4, color: 'var(--dsw-alias-label-secondary)' } }, t('description')),
+          h('div', { style: { fontSize: 14, lineHeight: '20px' } }, title),
+          h('div', { style: { fontSize: 12, lineHeight: '18px', marginTop: 4, color: 'var(--dsw-alias-label-secondary)' } }, description),
+        ),
+        h(Switch, { checked, label: title, onChange }),
+      )
+    }
+
+    /** The plugin's own Settings page: one independent switch per trigger. */
+    function PredictionsSettings({ t }) {
+      const nextEnabled = usePreference('next')
+      const continueEnabled = usePreference('continue')
+      return h('div', { style: { padding: '4px 0' } },
+        h('style', null, SWITCH_CSS),
+        h(PreferenceRow, {
+          title: t('nextTitle'),
+          description: t('nextDescription'),
+          checked: nextEnabled,
+          onChange: (value) => setPreference('next', value),
+        }),
+        h(PreferenceRow, {
+          title: t('continueTitle'),
+          description: t('continueDescription'),
+          checked: continueEnabled,
+          onChange: (value) => setPreference('continue', value),
+        }),
+        h('div', { style: { paddingTop: 12, fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-label-tertiary)' } },
+          t('footnote'),
           h('a', { href: STAR_SUITE_URL, target: '_blank', rel: 'noopener noreferrer', title: t('starSuiteTitle'),
-            style: { display: 'inline-block', marginTop: 6, fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-link)', textDecoration: 'none' } },
+            style: { display: 'inline-block', marginTop: 6, marginLeft: 8, color: 'var(--dsw-alias-link)', textDecoration: 'none' } },
             '★ ' + t('starSuite')),
         ),
-        h(Switch, { checked, label: t('enabled'), onChange: setEnabled }),
       )
     }
 
@@ -407,7 +462,8 @@ window.__ModuleLoader__.load({
 
     function ComposerPrediction(props) {
       const { sessionId, useInput, useSessionStatus, inputActions, t } = props
-      const predictionsEnabled = useEnabled()
+      const nextEnabled = usePreference('next')
+      const continueEnabled = usePreference('continue')
       const draft = useInput((state) => (state === undefined ? '' : state.draft || ''))
       const running = useSessionStatus((state) => (state === undefined ? false : state.get(sessionId)?.running === true))
       const [ghost, setGhost] = React.useState(NO_GHOST)
@@ -505,11 +561,11 @@ window.__ModuleLoader__.load({
       )
 
       React.useEffect(() => {
-        if (predictionsEnabled) return
+        if (nextEnabled || continueEnabled) return
         abortRef.current?.abort()
         setGhost(NO_GHOST)
         setBox(null)
-      }, [predictionsEnabled])
+      }, [nextEnabled, continueEnabled])
 
       // IME composition owns the draft until it commits: no prediction work.
       React.useEffect(() => {
@@ -560,19 +616,21 @@ window.__ModuleLoader__.load({
       // `next`: ask once the turn has settled and the composer is empty.
       React.useEffect(() => {
         if (sessionId === undefined || sessionId === null) return undefined
-        if (!predictionsEnabled || running || draft !== '') return undefined
+        if (!nextEnabled || running || draft !== '') return undefined
         if (dismissedRef.current !== null && dismissedRef.current.draft === draft) return undefined
         const timer = setTimeout(() => {
           if (composingRef.current) return
           void request('next', '')
         }, SETTLE_MS)
         return () => clearTimeout(timer)
-      }, [sessionId, running, draft, request, predictionsEnabled, compositionEnd])
+      }, [sessionId, running, draft, request, nextEnabled, compositionEnd])
 
-      // `continue`: ask after a pause, only with the caret at the draft's end.
+      // `continue`: ask after a typing pause, only with the caret at the end.
+      // Independent of `next` above: this fork ships it off by default so nothing
+      // is requested while typing unless the user turns it on in Settings.
       React.useEffect(() => {
         if (sessionId === undefined || sessionId === null) return undefined
-        if (!predictionsEnabled || draft.trim() === '' || draft.length < CONTINUE_MIN_CHARS) return undefined
+        if (!continueEnabled || draft.trim() === '' || draft.length < CONTINUE_MIN_CHARS) return undefined
         if (isTriggerToken(draft)) return undefined
         if (dismissedRef.current !== null && dismissedRef.current.draft === draft) return undefined
         const timer = setTimeout(() => {
@@ -583,12 +641,12 @@ window.__ModuleLoader__.load({
           void request('continue', draft.slice(-MAX_DRAFT_CHARS))
         }, TYPE_PAUSE_MS)
         return () => clearTimeout(timer)
-      }, [sessionId, draft, request, predictionsEnabled, compositionEnd])
+      }, [sessionId, draft, request, continueEnabled, compositionEnd])
 
       // A prediction skipped while the page was hidden is retried on return.
       React.useEffect(() => {
         const onVisibility = () => {
-          if (!predictionsEnabled || document.hidden) return
+          if (!nextEnabled || document.hidden) return
           if (draft !== '' || running) return
           if (currentRef.current !== '' || dismissedRef.current !== null) return
           if (sessionId === undefined || sessionId === null) return
@@ -596,7 +654,7 @@ window.__ModuleLoader__.load({
         }
         document.addEventListener('visibilitychange', onVisibility)
         return () => document.removeEventListener('visibilitychange', onVisibility)
-      }, [draft, running, sessionId, request, predictionsEnabled])
+      }, [draft, running, sessionId, request, nextEnabled])
 
       const rawCandidate = ghost.items.length > 0
         ? ghost.items[Math.min(ghost.index, ghost.items.length - 1)] ?? ''
@@ -606,7 +664,7 @@ window.__ModuleLoader__.load({
       const hasCandidate = current !== ''
 
       const visible =
-        predictionsEnabled &&
+        (ghost.mode === 'next' ? nextEnabled : continueEnabled) &&
         current !== '' &&
         box !== null &&
         (ghost.mode === 'next'
@@ -842,28 +900,35 @@ window.__ModuleLoader__.load({
 
     return {
       inject: ['slots', 'locale'],
-      __testing: { joinContinuation, parseSseText, streamingCandidate, cleanLine, consumeStream, setEnabled, readEnabled },
+      __testing: { joinContinuation, parseSseText, streamingCandidate, cleanLine, consumeStream, setPreference, preferences },
       apply(ctx) {
         const t = ctx.locale.bind(NS)
         ctx.effect(() => ctx.locale.register(NS, DICTIONARIES))
         ctx.effect(() => {
+          // Another tab changing either switch applies here too.
           const onStorage = (event) => {
-            if (event.key !== PREFERENCE_KEY && event.key !== null) return
-            enabled = event.newValue !== 'false'
+            if (event.key !== null && !Object.values(PREFERENCE_KEYS).includes(event.key)) return
+            for (const mode of Object.keys(PREFERENCE_KEYS)) {
+              const raw = storedPreference(PREFERENCE_KEYS[mode])
+              if (raw !== null) preferences[mode] = raw !== 'false'
+            }
             for (const listener of preferenceListeners) listener()
           }
           window.addEventListener('storage', onStorage)
           return () => window.removeEventListener('storage', onStorage)
         })
-        ctx.slots.inject('settings.general.item', () => ctx.slots.register(
-          { name: 'settings.general.item', id: 'composer-predictions', order: 50, label: () => t('enabled') },
-          () => h(PredictionsSetting, { t }),
+        // Its own Settings page rather than one row, because the two triggers are
+        // independent: the next-message suggestion and the mid-draft prediction
+        // cost very different amounts and are useful to different people.
+        ctx.slots.inject('settings.section', () => ctx.slots.register(
+          { name: 'settings.section', id: 'composer-suggestion', order: 50, label: () => t('nav'), locale: NS },
+          (sectionProps) => h(PredictionsSettings, { ...sectionProps, t }),
         ))
         ctx.slots.inject(SLOT, () =>
           ctx.slots.register(
             {
               name: SLOT,
-              id: 'composer-predictions',
+              id: 'composer-suggestion',
               order: 10,
               label: () => t('label'),
             },

@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Composer suggestions",
-    "description": "Suggests the next message after a turn and continues drafts while you pause; press Tab to accept and Alt+Down to cycle candidates."
+    "title": "Composer predictions (fork)",
+    "description": "Suggests the next message after a turn; mid-draft prediction is a separate switch. Press Tab to accept and Alt+Down to cycle candidates."
   }
 }
