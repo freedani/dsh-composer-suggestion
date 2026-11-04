@@ -87,8 +87,8 @@ window.__ModuleLoader__.load({
         continueTitle: 'Predict the current draft',
         continueDescription: 'While you pause mid-draft, suggest how the sentence continues. Sends a request after each typing pause, so it costs more than the next-message suggestion.',
         footnote: 'An accepted suggestion only fills an editable draft; nothing is sent. These switches are saved in this browser on this device.',
-        starSuite: 'Star the suite',
-        starSuiteTitle: 'Star the Stijnus DSH plugin suite on GitHub',
+        starSuite: 'Star this repository',
+        starSuiteTitle: 'Star freedani/dsh-composer-suggestion on GitHub',
         ready: 'Suggestion: {text}. Press Tab to accept. Alt+Down or Alt+Up changes candidates. Escape dismisses.',
       },
       zh: {
@@ -101,14 +101,14 @@ window.__ModuleLoader__.load({
         continueTitle: '当前输入框预测',
         continueDescription: '打字停顿后预测这句话接下来怎么写。每次停顿都会请求一次，比「下一步建议」更费 token。',
         footnote: '采纳后只是草稿，不会直接发送。两个开关都保存在当前设备的浏览器中。',
-        starSuite: '为插件套件点星',
-        starSuiteTitle: '在 GitHub 上为 Stijnus 的 DSH 插件套件点星',
+        starSuite: '为这个仓库点星',
+        starSuiteTitle: '在 GitHub 上为 freedani/dsh-composer-suggestion 点星',
         ready: '建议：{text}。按 Tab 采纳，Alt+↓ 或 Alt+↑ 切换，Escape 关闭。',
       },
     }
 
     /** Quiet, user-initiated suite star link. */
-    const STAR_SUITE_URL = 'https://github.com/Stijnus?tab=repositories&q=dsh'
+    const STAR_SUITE_URL = 'https://github.com/freedani/dsh-composer-suggestion'
 
     /** Per-mode switches: each trigger is enabled on its own. */
     const PREFERENCE_KEYS = {
