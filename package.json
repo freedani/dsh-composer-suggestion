@@ -4,6 +4,7 @@
   "description": "Fork of dsh-composer-predictions with one switch per trigger: the after-turn suggestion and the mid-draft prediction are enabled independently, on a Settings page of their own",
   "type": "module",
   "license": "MIT",
+  "author": "freedani",
   "scripts": {
     "test": "node --test"
   },
